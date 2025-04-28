@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import select
 from app.database.models import Base, Asset
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
@@ -27,11 +29,11 @@ async def init_db():
         existing_assets = result.scalars().all()
         if not existing_assets:
             initial_assets = [
-                Asset(symbol="BTCUSDT", name="Bitcoin"),
-                Asset(symbol="ETHUSDT", name="Ethereum"),
-                Asset(symbol="SOLUSDT", name="Solana"),
-                Asset(symbol="TONUSDT", name="Toncoin"),
-                Asset(symbol="BNBUSDT", name="BNB")
+                Asset(symbol="BTCUSDT", name="Bitcoin", prev_price=0, prev_time=datetime.utcnow()),
+                Asset(symbol="ETHUSDT", name="Ethereum", prev_price=0, prev_time=datetime.utcnow()),
+                Asset(symbol="SOLUSDT", name="Solana", prev_price=0, prev_time=datetime.utcnow()),
+                Asset(symbol="TONUSDT", name="Toncoin", prev_price=0, prev_time=datetime.utcnow()),
+                Asset(symbol="BNBUSDT", name="BNB", prev_price=0, prev_time=datetime.utcnow())
             ]
             session.add_all(initial_assets)
             await session.commit()

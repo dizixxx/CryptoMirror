@@ -24,6 +24,9 @@ class Asset(Base):
     symbol: Mapped[str] = mapped_column(String(20), primary_key=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
 
+    prev_price: Mapped[float] = mapped_column(Float)
+    prev_time: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
     trades: Mapped[list["Trade"]] = relationship(back_populates="asset", cascade="all, delete-orphan")
     balances: Mapped[list["Balance"]] = relationship(back_populates="asset", cascade="all, delete-orphan")
 
@@ -37,8 +40,8 @@ class Trade(Base):
     trade_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id"))
     symbol: Mapped[str] = mapped_column(ForeignKey("assets.symbol"))
-    amount: Mapped[float] = mapped_column(Float)  # В USDT
-    price: Mapped[float] = mapped_column(Float)   # Цена покупки
+    amount: Mapped[float] = mapped_column(Float)
+    price: Mapped[float] = mapped_column(Float)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship(back_populates="trades")

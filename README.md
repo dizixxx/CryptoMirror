@@ -3,7 +3,7 @@ smth about :)
 
 Архитектура проекта:
 ```
-project/
+CryptoMirror/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
@@ -19,6 +19,8 @@ project/
 │   │   ├── __init__.py
 │   └── utils/
 │       ├── __init__.py
+├── tools/
+│   ├── ava_cryptomirror.jpg
 ├── .files
-└── README.txt	
+└── README.md
 ```
