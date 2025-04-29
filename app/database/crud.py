@@ -1,6 +1,5 @@
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 from app.database.models import User
 from sqlalchemy.exc import IntegrityError
 from app.database.models import Asset
