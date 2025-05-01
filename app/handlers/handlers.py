@@ -14,15 +14,3 @@ router = Router()
 @router.message(Command('help'))
 async def cmd_help(message: Message):
     await message.answer('ты попросил помощь')
-
-@router.message(Command('buy'))
-async def cmd_buy(message: Message):
-    await message.answer('ты хочешь купить')
-
-@router.message(Command('balance'))
-async def cmd_balance(message: Message):
-    await message.answer('ты хочешь узнать баланс')
-
-@router.message(Command('sell'))
-async def cmd_sell(message: Message):
-    await message.answer('ты хочешь продать')

@@ -2,8 +2,8 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 
-from app.database.crud import get_user_by_id, create_user
-from app.database.init_engine import get_async_session
+from app.database.crud import get_user_by_id, create_user, update_balance
+from app.database.init_engine import get_async_session, AsyncSessionLocal
 
 router = Router()
 
@@ -18,6 +18,12 @@ async def cmd_start(message: Message):
 
         if not user:
             await create_user(session, user_id, username)
-            await message.answer(f"Добро пожаловать, {first_name}! Вы успешно зарегистрированы в системе.")
+            await update_balance(session, message.from_user.id, "USDT", 100.0)
+
+            await message.answer(
+                f"🚀 Добро пожаловать, {first_name}! Вы успешно зарегистрированы в системе.\n"
+                f"Ваш начальный баланс: 100.00 USDT\n"
+                f"Используйте /buy для покупки криптовалюты."
+            )
         else:
             await message.answer(f"Здравствуйте, {first_name}! Вы уже зарегистрированы, так что можете продолжать трейдинг.")

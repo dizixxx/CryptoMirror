@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import select
-from app.database.models import Base, Asset
+from app.database.models import Base, Asset, Balance
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, AsyncSession
 
 DATABASE_URL = "sqlite+aiosqlite:///./trading.db"
@@ -37,3 +37,5 @@ async def init_db():
             ]
             session.add_all(initial_assets)
             await session.commit()
+
+    Asset(symbol="USD", name="US Dollar", prev_price=1.0, prev_time=datetime.utcnow()),

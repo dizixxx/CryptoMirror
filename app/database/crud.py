@@ -1,7 +1,10 @@
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database.models import User
+from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
+
+from app.database.models import User, Balance
 from app.database.models import Asset
 
 async def create_user(session: AsyncSession, user_id: int, username: str) -> User:
@@ -42,11 +45,64 @@ async def upsert_asset_price(session: AsyncSession, symbol: str, name: str, pric
         await session.rollback()
         raise
 
-from app.database.models import Asset
-from sqlalchemy.future import select
-
 async def get_asset_price(session, symbol: str):
     result = await session.execute(select(Asset).filter_by(symbol=symbol))
     asset = result.scalars().first()
     return asset
 
+
+# app/database/crud.py
+async def get_user_balance(session: AsyncSession, user_id: int):
+    stmt = (
+        select(Balance)
+        .filter(Balance.user_id == user_id)
+        .options(selectinload(Balance.asset))
+    )
+    result = await session.execute(stmt)
+    balances = result.scalars().all()
+
+    balance_info = []
+    for balance in balances:
+        asset_name = balance.asset.name if balance.asset else balance.symbol
+
+        balance_info.append({
+            "symbol": balance.symbol,
+            "asset_name": asset_name,
+            "total_amount": balance.total_amount
+        })
+
+    return balance_info
+
+async def update_balance(session: AsyncSession, user_id: int, symbol: str, amount: float):
+
+    asset = await session.get(Asset, symbol)
+    if not asset:
+        asset = Asset(
+            symbol=symbol,
+            name=symbol,
+            prev_price=0.0,
+            prev_time=datetime.utcnow()
+        )
+        session.add(asset)
+        await session.commit()
+
+    result = await session.execute(
+        select(Balance).filter(Balance.user_id == user_id, Balance.symbol == symbol)
+    )
+
+    balance = result.scalars().first()
+    if balance:
+        balance.total_amount += amount
+    else:
+        balance = Balance(
+            user_id=user_id,
+            symbol=symbol,
+            total_amount=amount
+        )
+        session.add(balance)
+    await session.commit()
+    return balance
+
+async def get_asset(session: AsyncSession, symbol: str) -> Asset:
+    result = await session.execute(select(Asset).filter(Asset.symbol == symbol))
+    return result.scalars().first()

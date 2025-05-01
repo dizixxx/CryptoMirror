@@ -1,7 +1,6 @@
 # *CryptoMirror*
-smth about :)
 
-Архитектура проекта:
+Project architecture:
 ```
 CryptoMirror/
 ├── app/
@@ -14,13 +13,17 @@ CryptoMirror/
 │   │   └── init_engine.py
 │   ├── handlers/
 │   │   ├── __init__.py
-│   │   ├── handlers.py
+│   │   ├── start.py
+│   │   ├── prices.py
+│   │   ├── handlers.py 
 │   ├── services/
 │   │   ├── __init__.py
+│   │   ├── binance.py
 │   └── utils/
 │       ├── __init__.py
+│   │   ├── keyboards.py
 ├── tools/
 │   ├── ava_cryptomirror.jpg
-├── .files
+├── .gitignore
 └── README.md
 ```

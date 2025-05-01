@@ -7,4 +7,3 @@ async def get_prices(pair):
         response = requests.get(f"https://api.binance.com/api/v3/ticker/price?symbol={pair}")
         data = response.json()
     return data
-

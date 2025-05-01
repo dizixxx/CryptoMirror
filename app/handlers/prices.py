@@ -39,7 +39,7 @@ async def cmd_prices(message: Message):
                 name=asset[data["symbol"]],
                 price=price
             )
-    ans += f'\n*Относительно предыдущего запроса, сделанного в {datetime.strptime("2025-04-28 19:46:00.734669 UTC", "%Y-%m-%d %H:%M:%S.%f UTC").strftime("%H:%M %d-%m")} UTC.'
+    ans += f'\n*Относительно предыдущего запроса, сделанного в {datetime.strptime(str(db_data.prev_time), "%Y-%m-%d %H:%M:%S.%f").strftime("%H:%M %d-%m")} UTC.'
     print(ans)
 
     await message.answer(f'{ans}')
