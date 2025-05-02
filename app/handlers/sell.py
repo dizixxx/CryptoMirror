@@ -49,11 +49,24 @@ async def cmd_sell(message: Message, state: FSMContext):
 async def asset_chosen(callback: CallbackQuery, state: FSMContext):
     asset = callback.data.split("_")[1]
     await state.update_data(chosen_asset=asset)
+
+    user_id = callback.from_user.id
+    async with AsyncSessionLocal() as session:
+        balance_info = await get_user_balance(session, user_id)
+        available = next(
+            (b["total_amount"]
+             for b in balance_info
+             if b["symbol"] == asset),
+            0.0
+        )
+
     await callback.message.edit_text(
         f"💰 Выбран актив: {asset}\n"
-        f"🔢 Введите количество {asset} для продажи:"
+        f"🔢 Введите количество {asset} для продажи:\n"
+        f"💳 Доступно для продажи: {format_float(available)} {asset}"
     )
     await state.set_state(SellStates.entering_amount)
+
 
 
 @router.message(SellStates.entering_amount, F.text)
