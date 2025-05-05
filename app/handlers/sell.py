@@ -1,9 +1,10 @@
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from app.services.binance import get_prices
 from app.database.init_engine import AsyncSessionLocal
 from app.database.crud import get_user_balance, update_balance
@@ -12,18 +13,25 @@ from app.database.models import Trade
 router = Router()
 
 
+def add_cancel_button(keyboard: InlineKeyboardBuilder = None) -> InlineKeyboardBuilder:
+    if keyboard is None:
+        keyboard = InlineKeyboardBuilder()
+    keyboard.row(InlineKeyboardButton(
+        text="❌ Разорвать сделку",
+        callback_data="cancel_deal"
+    ))
+    return keyboard
+
+
 class SellStates(StatesGroup):
     choosing_asset = State()
     entering_amount = State()
     confirming = State()
 
 
-def format_float(value: float) -> str:
-    return "{:.8f}".format(value).rstrip('0').rstrip('.') if '.' in str(value) else str(value)
-
-
 @router.message(Command("sell"))
 async def cmd_sell(message: Message, state: FSMContext):
+    """Начало процесса продажи - выбор актива"""
     user_id = message.from_user.id
     async with AsyncSessionLocal() as session:
         balance_info = await get_user_balance(session, user_id)
@@ -35,150 +43,198 @@ async def cmd_sell(message: Message, state: FSMContext):
 
     builder = InlineKeyboardBuilder()
     for asset in assets:
-        builder.button(text=asset, callback_data=f"sell_{asset}")
+        builder.button(text=asset, callback_data=f"asset_{asset}")
     builder.adjust(2)
+    builder = add_cancel_button(builder)
 
-    await message.answer(
-        "💱 Выберите актив, который хотите продать за USDT:",
-        reply_markup=builder.as_markup()
+    sent_message = await message.answer(
+        "💱 Выберите актив для продажи:",
+        reply_markup=builder.as_markup(),
     )
+
+    await state.update_data(bot_message_id=sent_message.message_id)
+    await message.delete()
     await state.set_state(SellStates.choosing_asset)
 
 
-@router.callback_query(SellStates.choosing_asset, F.data.startswith("sell_"))
+@router.callback_query(SellStates.choosing_asset, F.data.startswith("asset_"))
 async def asset_chosen(callback: CallbackQuery, state: FSMContext):
+    """Обработка выбранного актива для продажи"""
+    data = await state.get_data()
     asset = callback.data.split("_")[1]
-    await state.update_data(chosen_asset=asset)
 
     user_id = callback.from_user.id
     async with AsyncSessionLocal() as session:
         balance_info = await get_user_balance(session, user_id)
-        available = next(
-            (b["total_amount"]
-             for b in balance_info
-             if b["symbol"] == asset),
-            0.0
-        )
+        available = next((b["total_amount"] for b in balance_info if b["symbol"] == asset), 0.0)
 
-    await callback.message.edit_text(
+    builder = add_cancel_button()
+
+    await callback.bot.edit_message_text(
         f"💰 Выбран актив: {asset}\n"
-        f"🔢 Введите количество {asset} для продажи:\n"
-        f"💳 Доступно для продажи: {format_float(available)} {asset}"
+        f"💳 Доступно: {available:.6f} {asset}\n\n"
+        f"🔢 Введите количество {asset} для продажи:",
+        chat_id=callback.message.chat.id,
+        message_id=data["bot_message_id"],
+        reply_markup=builder.as_markup()
     )
-    await state.set_state(SellStates.entering_amount)
 
+    await state.update_data(chosen_asset=asset, available_amount=available)
+    await state.set_state(SellStates.entering_amount)
+    await callback.answer()
 
 
 @router.message(SellStates.entering_amount, F.text)
 async def amount_entered(message: Message, state: FSMContext):
-    try:
-        input_amount = message.text.replace(",", ".")
-        asset_amount = round(float(input_amount), 8)
-
-        if asset_amount <= 0:
-            raise ValueError
-    except ValueError:
-        builder = InlineKeyboardBuilder()
-        builder.button(text="🔁 Повторить ввод", callback_data="retry_amount")
-        builder.button(text="❌ Отменить", callback_data="confirm_no")
-        builder.adjust(2)
-
-        await message.answer(
-            "❌ Некорректное количество. Введите положительное число.",
-            reply_markup=builder.as_markup()
-        )
-        return
-
+    """Обработка введенного количества для продажи"""
     data = await state.get_data()
     asset = data["chosen_asset"]
+    available = data["available_amount"]
 
-    async with AsyncSessionLocal() as session:
-        balance_info = await get_user_balance(session, message.from_user.id)
-        available = next(
-            (b["total_amount"]
-             for b in balance_info
-             if b["symbol"] == asset),
-            0.0
-        )
+    await message.delete()
+
+    try:
+        asset_amount = float(message.text.replace(",", "."))
+        if asset_amount <= 0:
+            raise ValueError
 
         if asset_amount > available:
-            await message.answer(
-                f"❌ Недостаточно {asset}. Доступно: {format_float(available)} {asset}"
+            builder = add_cancel_button()
+
+            await message.bot.edit_message_text(
+                f"❌ Недостаточно {asset}. Доступно: {available:.6f}\n\n"
+                f"Введите другое количество {asset}:",
+                chat_id=message.chat.id,
+                message_id=data["bot_message_id"],
+                reply_markup=builder.as_markup()
             )
-            await state.clear()
             return
 
-        price_data = await get_prices(f"{asset}")
-        price = round(float(price_data["price"]), 8)
-        usdt_amount = round(asset_amount * price, 2)
+        async with AsyncSessionLocal() as session:
+            price_data = await get_prices(f"{asset}")
+            price = float(price_data["price"])
+            usdt_amount = asset_amount * price
 
-        await state.update_data(
-            asset_amount=asset_amount,
-            usdt_amount=usdt_amount,
-            price=price
-        )
+            await state.update_data(
+                usdt_amount=usdt_amount,
+                price=price,
+                asset_amount=asset_amount
+            )
 
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✅ Подтвердить", callback_data="confirm_yes")
+            builder.button(text="✏️ Изменить", callback_data="confirm_change")
+            builder = add_cancel_button(builder)
+            builder.adjust(2)
+
+            await message.bot.edit_message_text(
+                f"🔄 Подтвердите продажу:\n\n"
+                f"• Актив: {asset}\n"
+                f"• Количество: {asset_amount:.6f} {asset}\n"
+                f"• Курс: {price:.2f} USDT\n"
+                f"• Сумма к зачислению: {usdt_amount:.2f} USDT",
+                chat_id=message.chat.id,
+                message_id=data["bot_message_id"],
+                reply_markup=builder.as_markup()
+            )
+            await state.set_state(SellStates.confirming)
+
+    except ValueError:
         builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Подтвердить", callback_data="confirm_yes")
-        builder.button(text="✏️ Изменить количество", callback_data="confirm_change")
-        builder.button(text="❌ Отменить", callback_data="confirm_no")
+        builder.button(text="🔁 Повторить", callback_data="retry_amount")
+        builder = add_cancel_button(builder)
         builder.adjust(2)
 
-        await message.answer(
-            f"🔄 Подтвердите продажу:\n\n"
-            f"• Актив: {asset}\n"
-            f"• Количество: {format_float(asset_amount)} {asset}\n"
-            f"• Курс: {format_float(price)} USDT/{asset}\n"
-            f"• Вы получите: {usdt_amount:.2f} USDT",
+        await message.bot.edit_message_text(
+            "❌ Некорректное количество. Введите положительное число:",
+            chat_id=message.chat.id,
+            message_id=data["bot_message_id"],
             reply_markup=builder.as_markup()
         )
-        await state.set_state(SellStates.confirming)
 
 
 @router.callback_query(SellStates.entering_amount, F.data == "retry_amount")
 async def retry_amount(callback: CallbackQuery, state: FSMContext):
+    """Повторный ввод количества"""
     data = await state.get_data()
     asset = data.get("chosen_asset", "актива")
-    await callback.message.edit_text(f"🔢 Введите количество {asset} для продажи:")
+
+    builder = add_cancel_button()
+
+    await callback.bot.edit_message_text(
+        f"🔢 Введите количество {asset} для продажи:",
+        chat_id=callback.message.chat.id,
+        message_id=data["bot_message_id"],
+        reply_markup=builder.as_markup()
+    )
+    await callback.answer()
 
 
 @router.callback_query(SellStates.confirming, F.data.startswith("confirm_"))
 async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
+    """Обработка подтверждения продажи"""
     action = callback.data.split("_")[1]
     data = await state.get_data()
     user_id = callback.from_user.id
 
     if action == "yes":
         async with AsyncSessionLocal() as session:
+            # Обновляем баланс
             await update_balance(session, user_id, data["chosen_asset"], -data["asset_amount"])
             await update_balance(session, user_id, "USDT", data["usdt_amount"])
 
+            # Сохраняем сделку
             trade = Trade(
                 user_id=user_id,
                 symbol=data["chosen_asset"],
                 amount=-data["asset_amount"],
-                price=data["price"]
+                price=data["price"],
             )
             session.add(trade)
             await session.commit()
 
-        await callback.message.edit_text(
-            f"✅ Продажа выполнена:\n"
-            f"• Продано: {format_float(data['asset_amount'])} {data['chosen_asset']}\n"
-            f"• Получено: {data['usdt_amount']:.2f} USDT\n"
-            f"• Курс: {format_float(data['price'])} USDT/{data['chosen_asset']}"
-        )
-        await state.clear()
+            # Формируем сообщение о успешной сделке
+            success_message = (
+                "✅ Продажа успешно выполнена!\n\n"
+                f"▫️ Актив: {data['chosen_asset']}\n"
+                f"▫️ Продано: {data['asset_amount']:.6f} {data['chosen_asset']}\n"
+                f"▫️ По курсу: {data['price']:.2f} USDT\n"
+                f"▫️ Зачислено: {data['usdt_amount']:.2f} USDT\n\n"
+                "Спасибо за использование нашего сервиса!"
+            )
+
+            await callback.bot.edit_message_text(
+                success_message,
+                chat_id=callback.message.chat.id,
+                message_id=data["bot_message_id"],
+                reply_markup=None
+            )
+            await state.clear()
 
     elif action == "change":
-        await callback.message.edit_text(f"🔢 Введите новое количество {data['chosen_asset']} для продажи:")
+        builder = add_cancel_button()
+
+        await callback.bot.edit_message_text(
+            f"✏️ Введите новое количество {data['chosen_asset']}:",
+            chat_id=callback.message.chat.id,
+            message_id=data["bot_message_id"],
+            reply_markup=builder.as_markup()
+        )
         await state.set_state(SellStates.entering_amount)
-
-    elif action == "no":
-        await callback.message.edit_text("❌ Сделка отменена.")
-        await state.clear()
+        await callback.answer("Введите новое количество")
 
 
-@router.message(SellStates.confirming)
-async def incorrect_confirmation(message: Message):
-    await message.answer("⚠️ Пожалуйста, используйте кнопки для подтверждения сделки.")
+@router.callback_query(F.data == "cancel_deal")
+async def handle_cancel_deal(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+
+    await callback.bot.edit_message_text(
+        "❌ Сделка прервана\n\n"
+        "Для начала новой сделки используйте /sell",
+        chat_id=callback.message.chat.id,
+        message_id=data["bot_message_id"],
+        reply_markup=None
+    )
+
+    await state.clear()
+    await callback.answer("Сделка отменена")

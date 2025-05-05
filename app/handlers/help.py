@@ -27,4 +27,5 @@ async def cmd_help(message: Message):
         "🚨 Все сделки сохраняются автоматически!"
     )
 
+
     await message.answer(help_text, parse_mode="HTML")
