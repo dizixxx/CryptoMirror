@@ -20,7 +20,6 @@ class BuyStates(StatesGroup):
 
 @router.message(Command("buy"))
 async def cmd_buy(message: Message, state: FSMContext):
-    # Исключаем USDT из списка пар
     pairs = [k for k in asset.keys() if k != "USDT"]
 
     builder = InlineKeyboardBuilder()

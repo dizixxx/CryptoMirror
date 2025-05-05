@@ -3,7 +3,7 @@ from aiogram.types import Message
 from aiogram.filters import CommandStart
 
 from app.database.crud import get_user_by_id, create_user, update_balance
-from app.database.init_engine import get_async_session, AsyncSessionLocal
+from app.database.init_engine import get_async_session
 
 router = Router()
 
