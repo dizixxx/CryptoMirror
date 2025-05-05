@@ -31,7 +31,6 @@ class SellStates(StatesGroup):
 
 @router.message(Command("sell"))
 async def cmd_sell(message: Message, state: FSMContext):
-    """Начало процесса продажи - выбор актива"""
     user_id = message.from_user.id
     async with AsyncSessionLocal() as session:
         balance_info = await get_user_balance(session, user_id)
@@ -59,7 +58,6 @@ async def cmd_sell(message: Message, state: FSMContext):
 
 @router.callback_query(SellStates.choosing_asset, F.data.startswith("asset_"))
 async def asset_chosen(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбранного актива для продажи"""
     data = await state.get_data()
     asset = callback.data.split("_")[1]
 
@@ -86,7 +84,6 @@ async def asset_chosen(callback: CallbackQuery, state: FSMContext):
 
 @router.message(SellStates.entering_amount, F.text)
 async def amount_entered(message: Message, state: FSMContext):
-    """Обработка введенного количества для продажи"""
     data = await state.get_data()
     asset = data["chosen_asset"]
     available = data["available_amount"]
@@ -172,18 +169,15 @@ async def retry_amount(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(SellStates.confirming, F.data.startswith("confirm_"))
 async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
-    """Обработка подтверждения продажи"""
     action = callback.data.split("_")[1]
     data = await state.get_data()
     user_id = callback.from_user.id
 
     if action == "yes":
         async with AsyncSessionLocal() as session:
-            # Обновляем баланс
             await update_balance(session, user_id, data["chosen_asset"], -data["asset_amount"])
             await update_balance(session, user_id, "USDT", data["usdt_amount"])
 
-            # Сохраняем сделку
             trade = Trade(
                 user_id=user_id,
                 symbol=data["chosen_asset"],
@@ -193,7 +187,6 @@ async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
             session.add(trade)
             await session.commit()
 
-            # Формируем сообщение о успешной сделке
             success_message = (
                 "✅ Продажа успешно выполнена!\n\n"
                 f"▫️ Актив: {data['chosen_asset']}\n"

@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from app.database.models import User, Balance
+from app.database.models import User, Balance, Trade
 from app.database.models import Asset
 
 async def create_user(session: AsyncSession, user_id: int, username: str) -> User:
@@ -51,7 +51,6 @@ async def get_asset_price(session, symbol: str):
     return asset
 
 
-# app/database/crud.py
 async def get_user_balance(session: AsyncSession, user_id: int):
     stmt = (
         select(Balance)
@@ -106,3 +105,13 @@ async def update_balance(session: AsyncSession, user_id: int, symbol: str, amoun
 async def get_asset(session: AsyncSession, symbol: str) -> Asset:
     result = await session.execute(select(Asset).filter(Asset.symbol == symbol))
     return result.scalars().first()
+
+
+async def get_user_trades_history(session: AsyncSession, user_id: int, limit: int = 15):
+    result = await session.execute(
+        select(Trade)
+        .where(Trade.user_id == user_id)
+        .order_by(Trade.timestamp.desc())
+        .limit(limit)
+    )
+    return result.scalars().all()

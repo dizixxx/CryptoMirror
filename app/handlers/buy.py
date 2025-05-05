@@ -24,6 +24,16 @@ def add_cancel_button(keyboard: InlineKeyboardBuilder = None) -> InlineKeyboardB
     return keyboard
 
 
+def add_close_button(keyboard: InlineKeyboardBuilder = None) -> InlineKeyboardBuilder:
+    if keyboard is None:
+        keyboard = InlineKeyboardBuilder()
+    keyboard.row(InlineKeyboardButton(
+        text="❌ Закрыть",
+        callback_data=f"delete_message"
+    ))
+    return keyboard
+
+
 class BuyStates(StatesGroup):
     choosing_pair = State()
     entering_amount = State()
@@ -147,7 +157,6 @@ async def amount_entered(message: Message, state: FSMContext):
 
 @router.callback_query(BuyStates.entering_amount, F.data == "retry_amount")
 async def retry_amount(callback: CallbackQuery, state: FSMContext):
-    """Повторный ввод количества"""
     data = await state.get_data()
     pair = data.get("chosen_pair", "актива")
 
@@ -164,18 +173,15 @@ async def retry_amount(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(BuyStates.confirming, F.data.startswith("confirm_"))
 async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
-    """Обработка подтверждения сделки"""
     action = callback.data.split("_")[1]
     data = await state.get_data()
     user_id = callback.from_user.id
 
     if action == "yes":
         async with AsyncSessionLocal() as session:
-            # Обновляем баланс
             await update_balance(session, user_id, "USDT", -data["usdt_amount"])
             await update_balance(session, user_id, data["chosen_pair"], data["asset_amount"])
 
-            # Сохраняем сделку
             trade = Trade(
                 user_id=user_id,
                 symbol=data["chosen_pair"],
@@ -185,7 +191,6 @@ async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
             session.add(trade)
             await session.commit()
 
-            # Формируем сообщение о успешной сделке
             success_message = (
                 "✅ Сделка успешно выполнена!\n\n"
                 f"▫️ Пара: {data['chosen_pair']}\n"
@@ -195,16 +200,16 @@ async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
                 "Спасибо за использование нашего сервиса!"
             )
 
+            builder = add_close_button()
             await callback.bot.edit_message_text(
                 success_message,
                 chat_id=callback.message.chat.id,
                 message_id=data["bot_message_id"],
-                reply_markup=None
+                reply_markup=builder.as_markup()
             )
             await state.clear()
 
     elif action == "change":
-        # Возвращаемся к вводу количества
         builder = add_cancel_button()
 
         await callback.bot.edit_message_text(
@@ -216,31 +221,29 @@ async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
         await state.set_state(BuyStates.entering_amount)
         await callback.answer("Введите новое количество")
 
-    elif action == "no":
-        # Сообщение об отмене
-        await callback.bot.edit_message_text(
-            "❌ Сделка отменена\n\n"
-            "Вы можете начать новую сделку командой /buy",
-            chat_id=callback.message.chat.id,
-            message_id=data["bot_message_id"],
-            reply_markup=None
-        )
-        await state.clear()
-        await callback.answer("Сделка отменена")
-
 
 @router.callback_query(F.data == "cancel_deal")
 async def handle_cancel_deal(callback: CallbackQuery, state: FSMContext):
-    """Обработка отмены сделки"""
     data = await state.get_data()
 
+    builder = add_close_button()
     await callback.bot.edit_message_text(
         "❌ Сделка прервана\n\n"
         "Для начала новой сделки используйте /buy",
         chat_id=callback.message.chat.id,
         message_id=data["bot_message_id"],
-        reply_markup=None
+        reply_markup=builder.as_markup()
     )
 
     await state.clear()
     await callback.answer("Сделка отменена")
+
+
+@router.callback_query(F.data == "delete_message")
+async def delete_message_handler(callback: CallbackQuery):
+    try:
+        await callback.message.delete()
+    except Exception as e:
+        await callback.answer(f"Не удалось удалить сообщение: {e}")
+    else:
+        await callback.answer("Сообщение удалено")
