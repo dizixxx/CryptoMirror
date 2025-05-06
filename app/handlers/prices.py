@@ -84,7 +84,6 @@ async def cmd_prices(message: Message, bot: Bot):
         reply_markup=builder.as_markup()
     )
 
-    # Обновляем callback_data с настоящим ID сообщения с ценами
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(
         text="❌ Закрыть",

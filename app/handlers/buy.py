@@ -82,7 +82,6 @@ async def pair_chosen(callback: CallbackQuery, state: FSMContext):
 
 @router.message(BuyStates.entering_amount, F.text)
 async def amount_entered(message: Message, state: FSMContext):
-    """Обработка введенного количества для покупки"""
     data = await state.get_data()
     pair = data["chosen_pair"]
 
