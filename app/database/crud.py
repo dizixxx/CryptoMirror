@@ -38,12 +38,8 @@ async def upsert_asset_price(session: AsyncSession, symbol: str, name: str, pric
         )
         session.add(asset)
 
-    try:
-        await session.commit()
-        return asset
-    except IntegrityError:
-        await session.rollback()
-        raise
+    await session.commit()
+    return asset
 
 async def get_asset_price(session, symbol: str):
     result = await session.execute(select(Asset).filter_by(symbol=symbol))

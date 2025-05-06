@@ -23,6 +23,16 @@ def add_cancel_button(keyboard: InlineKeyboardBuilder = None) -> InlineKeyboardB
     return keyboard
 
 
+def add_close_button(keyboard: InlineKeyboardBuilder = None) -> InlineKeyboardBuilder:
+    if keyboard is None:
+        keyboard = InlineKeyboardBuilder()
+    keyboard.row(InlineKeyboardButton(
+        text="❌ Закрыть",
+        callback_data="delete_message"
+    ))
+    return keyboard
+
+
 class SellStates(StatesGroup):
     choosing_asset = State()
     entering_amount = State()
@@ -37,7 +47,7 @@ async def cmd_sell(message: Message, state: FSMContext):
         assets = [b["symbol"] for b in balance_info if b["symbol"] != "USDT" and b["total_amount"] > 0]
 
     if not assets:
-        await message.answer("❌ У вас нет активов для продажи.")
+        await message.answer("❌ У вас нет активов для продажи")
         return
 
     builder = InlineKeyboardBuilder()
@@ -196,11 +206,12 @@ async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
                 "Спасибо за использование нашего сервиса!"
             )
 
+            builder = add_close_button()
             await callback.bot.edit_message_text(
                 success_message,
                 chat_id=callback.message.chat.id,
                 message_id=data["bot_message_id"],
-                reply_markup=None
+                reply_markup=builder.as_markup()
             )
             await state.clear()
 
@@ -221,13 +232,24 @@ async def handle_confirmation(callback: CallbackQuery, state: FSMContext):
 async def handle_cancel_deal(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
 
+    builder = add_close_button()
     await callback.bot.edit_message_text(
         "❌ Сделка прервана\n\n"
         "Для начала новой сделки используйте /sell",
         chat_id=callback.message.chat.id,
         message_id=data["bot_message_id"],
-        reply_markup=None
+        reply_markup=builder.as_markup()
     )
 
     await state.clear()
     await callback.answer("Сделка отменена")
+
+
+@router.callback_query(F.data == "delete_message")
+async def delete_message_handler(callback: CallbackQuery):
+    try:
+        await callback.message.delete()
+    except Exception as e:
+        await callback.answer(f"Не удалось удалить сообщение: {e}")
+    else:
+        await callback.answer("Сообщение удалено")

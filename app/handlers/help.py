@@ -36,7 +36,8 @@ async def cmd_help(message: Message):
 
     sent_message = await message.answer(
         text=response,
-        reply_markup=builder.as_markup()
+        reply_markup=builder.as_markup(),
+        parse_mode='HTML'
     )
 
     builder_with_both = InlineKeyboardBuilder()

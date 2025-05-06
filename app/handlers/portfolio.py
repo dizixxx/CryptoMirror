@@ -35,9 +35,9 @@ async def cmd_prices(message: Message):
         response = "💼 Ваш портфель:\n"
         for iter_asset in balance_info:
             if iter_asset['symbol'] != 'USDT':
-                response += f"{iter_asset['symbol']}: {float(format_float_number(str(iter_asset['total_amount'])))}\n"
+                response += f"• {iter_asset['symbol']}: {float(format_float_number(str(iter_asset['total_amount'])))}\n"
             else:
-                delay_ustd = f"{iter_asset['symbol']}: {iter_asset['total_amount']:.2f}\n"
+                delay_ustd = f"• {iter_asset['symbol']}: {iter_asset['total_amount']:.2f}\n"
         response += f'\n💰 Ваш баланс:\n{delay_ustd}'
 
         builder = InlineKeyboardBuilder()

@@ -42,11 +42,14 @@ def format_trade_message(trade: Trade, current_price: float) -> str:
     price_diff = current_price - trade.price
     percent_diff = (price_diff / trade.price) * 100 if trade.price != 0 else 0
 
-    action = "🟢 Куплено" if trade.amount > 0 else "🔴 Продано"
+    action = "⬇️ Куплено" if trade.amount > 0 else "⬆️ Продано"
     amount = abs(trade.amount)
+
+    trade_time = trade.timestamp.strftime("%d.%m.%Y %H:%M UTC")
 
     return (
         f"{trade.symbol}: {format_amount(amount)} {action} по {format_price(trade.price)} USDT\n"
+        f"   ⏰ Время сделки: {trade_time}\n"
         f"   📊 Текущая цена: {format_price(current_price)} USDT "
         f"({format_price(price_diff)}, {format_percentage_change(percent_diff)})"
     )
@@ -106,14 +109,12 @@ async def build_response_and_keyboard(user_id: int, page: int = 0, original_mess
         current_page = pages[page]
 
         response = (
-            f"📊 <b>История операций</b> (страница {page + 1}/{len(pages)})\n"
-            f"--------------------------------\n"
+            f"📊 История операций (страница {page + 1}/{len(pages)})\n\n"
         )
 
         for trade in current_page:
             current_price = current_prices.get(trade.symbol, 0)
-            response += f"\n{format_trade_message(trade, current_price)}\n"
-            response += "--------------------------------"
+            response += f"\n\n{format_trade_message(trade, current_price)}\n\n"
 
         builder = InlineKeyboardBuilder()
 
@@ -194,9 +195,7 @@ async def handle_balance_close(callback: CallbackQuery):
 
     if callback.from_user.id == user_id:
         try:
-            # Удаляем сообщение с историей операций
             await callback.message.delete()
-            # Удаляем исходное сообщение с командой /balance
             await callback.bot.delete_message(
                 chat_id=callback.message.chat.id,
                 message_id=original_message_id
