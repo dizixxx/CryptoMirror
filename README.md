@@ -17,11 +17,11 @@
 git clone https://github.com/dizixxx/CryptoMirror.git
 cd CryptoMirror
 pip install -r requirements.txt
-# create .env file
+# создайте .env файл с BOT_TOKEN=
 python main.py
 ```
 
-### **Project architecture**:
+### **Архитектура проекта**:
 ```
 CryptoMirror/
 ├── app/
