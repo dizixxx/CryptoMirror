@@ -42,7 +42,6 @@ class BuyStates(StatesGroup):
 
 @router.message(Command("buy"))
 async def cmd_buy(message: Message, state: FSMContext):
-    """Начало процесса покупки - выбор пары"""
     pairs = [k for k in asset.keys() if k != "USDT"]
 
     builder = InlineKeyboardBuilder()
@@ -63,7 +62,6 @@ async def cmd_buy(message: Message, state: FSMContext):
 
 @router.callback_query(BuyStates.choosing_pair, F.data.startswith("pair_"))
 async def pair_chosen(callback: CallbackQuery, state: FSMContext):
-    """Обработка выбранной торговой пары"""
     data = await state.get_data()
     pair = callback.data.split("_")[1]
 
@@ -96,7 +94,7 @@ async def amount_entered(message: Message, state: FSMContext):
             raise ValueError
 
         async with AsyncSessionLocal() as session:
-            price_data = await get_prices(f"{pair}")
+            price_data = await get_prices(pair)
             price = float(price_data["price"])
             usdt_amount = asset_amount * price
 

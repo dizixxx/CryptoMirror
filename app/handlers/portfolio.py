@@ -62,7 +62,6 @@ async def cmd_prices(message: Message):
     @router.callback_query(F.data.startswith("delete_messages_"))
     async def delete_messages(callback_query: types.CallbackQuery):
         parts = callback_query.data.split("_")
-        user_id = int(parts[2])
         message1_id = int(parts[3])
         message2_id = int(parts[4]) if len(parts) > 4 else None
 
